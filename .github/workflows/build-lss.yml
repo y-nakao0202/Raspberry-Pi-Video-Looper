@@ -33,6 +33,10 @@ jobs:
           git clone --depth 1 --branch 2021.11 https://github.com/buildroot/buildroot.git buildroot
           cp -a board/tt_rpi buildroot/board/tt_rpi
           cp configs/rpi0w_tt_defconfig buildroot/configs/rpi0w_tt_defconfig
+      - name: Set LSS init script permissions
+        run: |
+          chmod 755 buildroot/board/tt_rpi/rootfs-overlay/etc/init.d/S02psplash
+          chmod 755 buildroot/board/tt_rpi/rootfs-overlay/etc/init.d/S91omxplayer
       - name: Build firmware and psplash
         run: |
           make -C buildroot rpi0w_tt_defconfig
