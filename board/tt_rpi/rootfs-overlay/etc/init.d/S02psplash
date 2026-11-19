@@ -1,0 +1,26 @@
+
+#!/bin/sh
+
+case "$1" in
+    start)
+        # Start LSS splash screen
+        /usr/bin/psplash -n >/dev/null 2>&1 &
+
+        # Wait briefly for psplash FIFO
+        i=0
+        while [ "$i" -lt 20 ] && [ ! -p /tmp/psplash_fifo ]; do
+            sleep 0.1
+            i=$((i + 1))
+        done
+
+        if [ -p /tmp/psplash_fifo ]; then
+            /usr/bin/psplash-write "PROGRESS 10" 2>/dev/null || true
+        fi
+        ;;
+
+    stop)
+        /usr/bin/psplash-write "QUIT" 2>/dev/null || true
+        ;;
+esac
+
+exit 0
