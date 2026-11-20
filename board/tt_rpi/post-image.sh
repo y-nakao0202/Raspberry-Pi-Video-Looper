@@ -35,6 +35,7 @@ do
 	esac
 done
 
+
 # Override cmdline.txt
 cat << __EOF__ > "${BINARIES_DIR}/rpi-firmware/cmdline.txt"
 console=ttyAMA0,115200 ipv6.disable=1 consoleblank=0 vt.global_cursor_default=0 logo.nologo ignore_loglevel root=/dev/mmcblk0p2 rootwait
@@ -52,10 +53,17 @@ boot_delay=0
 disable_splash=1
 enable_uart=1
 dtoverlay=miniuart-bt
+device_tree=bcm2708-rpi-zero-w.dtb
+
+hdmi_force_hotplug=1
+hdmi_group=2
+hdmi_mode=87
+hdmi_timings=440 1 30 20 30 1920 1 10 5 10 0 0 0 60 0 60680000 1
+disable_overscan=1
 __EOF__
 
-# Create empty video.txt
-touch ${BINARIES_DIR}/video.txt
+# Create video.txt with default playback settings
+printf '%s\n' '--win 0,0,440,1920 /boot/video.mp4' > "${BINARIES_DIR}/video.txt"
 
 echo "Generating SD image"
 rm -rf "${GENIMAGE_TMP}"
