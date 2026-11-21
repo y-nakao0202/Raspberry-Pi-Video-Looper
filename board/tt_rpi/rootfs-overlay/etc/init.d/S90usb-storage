@@ -5,7 +5,41 @@ LOG=/run/lss-mode.log
 MODEFILE=/run/lss-mode
 DEVICE=/dev/mmcblk0p3
 
-# Detect USB host enumeration
+# Show status on splash screen and log
+report() {
+    echo "$1" >> "$LOG"
+    /usr/bin/psplash-write "MSG $1" \
+        2>/dev/null || true
+}
+
+# Check if mass storage module is loaded
+gadget_loaded() {
+    grep -q '^g_mass_storage ' /proc/modules
+}
+
+# Safely release USB storage
+release_gadget() {
+    if gadget_loaded; then
+        modprobe -r g_mass_storage \
+            >> "$LOG" 2>&1 || return 1
+    fi
+
+    ! gadget_loaded
+}
+
+# Enter playback only after storage is released
+enter_playback() {
+    if ! release_gadget; then
+        report "ERROR USB RELEASE"
+        return 1
+    fi
+
+    echo "playback" > "$MODEFILE"
+    report "PLAYBACK MODE"
+    return 0
+}
+
+# Detect USB host connection
 host_detected() {
     for f in /sys/class/udc/*/state; do
         [ -r "$f" ] || continue
@@ -16,46 +50,57 @@ host_detected() {
                 ;;
         esac
     done
+
     return 1
 }
 
 case "$1" in
     start)
-        echo "Starting LSS mode detection" > "$LOG"
+        : > "$LOG"
         echo "error" > "$MODEFILE"
 
+        report "CHECKING STORAGE"
+
         if [ ! -b "$DEVICE" ]; then
-            echo "Video partition missing" >> "$LOG"
+            report "ERROR VIDEO PARTITION"
             exit 1
         fi
 
-        # Register USB gadget first
+        if grep -q "^$DEVICE " /proc/mounts; then
+            report "ERROR VIDEO MOUNTED"
+            exit 1
+        fi
+
+        report "INITIALIZING USB"
+
+        # USB controller may be unavailable
+        # when powered without a USB host
         if ! modprobe dwc2 >> "$LOG" 2>&1; then
-            echo "dwc2 load failed" >> "$LOG"
-            exit 1
+            report "USB UNAVAILABLE"
+            enter_playback || exit 1
+            exit 0
         fi
 
+        # Try to enable USB storage
         if ! modprobe g_mass_storage \
             file="$DEVICE" \
             removable=1 \
             ro=0 \
             stall=0 >> "$LOG" 2>&1; then
-            echo "g_mass_storage load failed" >> "$LOG"
-            exit 1
+
+            report "USB UNAVAILABLE"
+            enter_playback || exit 1
+            exit 0
         fi
 
-        # Allow time for PC enumeration
+        report "WAITING FOR PC"
+
+        # Wait up to 6 seconds
         i=0
         while [ "$i" -lt 30 ]; do
-
             if host_detected; then
                 echo "usb" > "$MODEFILE"
-                echo "USB storage mode" >> "$LOG"
-
-                /usr/bin/psplash-write \
-                    "MSG USB STORAGE MODE" \
-                    2>/dev/null || true
-
+                report "USB STORAGE MODE"
                 exit 0
             fi
 
@@ -63,23 +108,14 @@ case "$1" in
             i=$((i + 1))
         done
 
-        # No host detected: release USB storage
-        if ! modprobe -r g_mass_storage \
-            >> "$LOG" 2>&1; then
-            echo "USB storage release failed" >> "$LOG"
-            exit 1
-        fi
+        # No USB host: enter playback mode
+        report "RELEASING USB"
 
-        echo "playback" > "$MODEFILE"
-        echo "Playback mode" >> "$LOG"
+        enter_playback || exit 1
         ;;
 
     stop)
-        if [ -f "$MODEFILE" ] &&
-           [ "$(cat "$MODEFILE")" = "usb" ]; then
-            modprobe -r g_mass_storage \
-                2>/dev/null || true
-        fi
+        release_gadget || true
         ;;
 esac
 
