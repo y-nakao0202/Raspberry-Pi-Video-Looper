@@ -36,6 +36,7 @@ jobs:
       - name: Set LSS init script permissions
         run: |
           chmod 755 buildroot/board/tt_rpi/rootfs-overlay/etc/init.d/S02psplash
+          chmod 755 buildroot/board/tt_rpi/rootfs-overlay/etc/init.d/S90usb-storage
           chmod 755 buildroot/board/tt_rpi/rootfs-overlay/etc/init.d/S91omxplayer
       - name: Build firmware and psplash
         run: |
