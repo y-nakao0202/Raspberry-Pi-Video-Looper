@@ -2,47 +2,75 @@
 #!/bin/sh
 
 PIDFILE=/run/lss-omxplayer.pid
-VIDEO=/boot/video.mp4
+MODEFILE=/run/lss-mode
+DEVICE=/dev/mmcblk0p3
+VIDEO=/video/video.mp4
 
 case "$1" in
     start)
-        # Ensure boot partition is mounted
-        if ! grep -q ' /boot ' /proc/mounts; then
-            mount /boot >/dev/null 2>&1 || true
+        # Run only in playback mode
+        MODE=$(cat "$MODEFILE" 2>/dev/null)
+
+        if [ "$MODE" != "playback" ]; then
+            exit 0
+        fi
+
+        # Mount video partition read-only
+        if ! grep -q ' /video ' /proc/mounts; then
+            if ! mount -t vfat -o ro \
+                "$DEVICE" /video; then
+                /usr/bin/psplash-write \
+                    "MSG VIDEO MOUNT FAILED" \
+                    2>/dev/null || true
+                exit 1
+            fi
         fi
 
         # Check video file
         if [ ! -f "$VIDEO" ]; then
-            /usr/bin/psplash-write "MSG VIDEO NOT FOUND" 2>/dev/null || true
+            /usr/bin/psplash-write \
+                "MSG VIDEO NOT FOUND" \
+                2>/dev/null || true
             exit 0
         fi
 
-        # Update splash progress
-        /usr/bin/psplash-write "PROGRESS 80" 2>/dev/null || true
+        /usr/bin/psplash-write \
+            "PROGRESS 80" 2>/dev/null || true
 
-        # Start fullscreen looping video
-        /usr/bin/omxplayer -b --loop --win 0,0,440,1920 "$VIDEO" \
+        # Start video playback
+        /usr/bin/omxplayer \
+            -b --loop --win 0,0,440,1920 \
+            "$VIDEO" \
             </dev/null >/dev/null 2>&1 &
 
         PID=$!
         echo "$PID" > "$PIDFILE"
 
-        # Allow player to initialize
         sleep 2
 
         if kill -0 "$PID" 2>/dev/null; then
-            /usr/bin/psplash-write "PROGRESS 100" 2>/dev/null || true
-            /usr/bin/psplash-write "QUIT" 2>/dev/null || true
+            /usr/bin/psplash-write \
+                "PROGRESS 100" \
+                2>/dev/null || true
+
+            /usr/bin/psplash-write \
+                "QUIT" \
+                2>/dev/null || true
         else
-            /usr/bin/psplash-write "MSG VIDEO FAILED" 2>/dev/null || true
+            /usr/bin/psplash-write \
+                "MSG VIDEO FAILED" \
+                2>/dev/null || true
         fi
         ;;
 
     stop)
         if [ -f "$PIDFILE" ]; then
-            kill "$(cat "$PIDFILE")" 2>/dev/null || true
+            kill "$(cat "$PIDFILE")" \
+                2>/dev/null || true
             rm -f "$PIDFILE"
         fi
+
+        umount /video 2>/dev/null || true
         ;;
 esac
 
