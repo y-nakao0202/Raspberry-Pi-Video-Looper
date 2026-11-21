@@ -66,6 +66,11 @@ __EOF__
 # Create video.txt with default playback settings
 printf '%s\n' '--win 0,0,440,1920 /boot/video.mp4' > "${BINARIES_DIR}/video.txt"
 
+
+# Include the user guide in the video partition
+cp "${CUSTOM_BOARD_DIR}/Readme.txt" \
+   "${BINARIES_DIR}/Readme.txt"
+
 echo "Generating SD image"
 rm -rf "${GENIMAGE_TMP}"
 
