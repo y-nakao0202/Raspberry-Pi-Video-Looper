@@ -15,6 +15,11 @@ case "$1" in
             exit 0
         fi
 
+        # Show playback startup status
+        /usr/bin/psplash-write \
+            "MSG MOUNTING VIDEO" \
+            2>/dev/null || true
+
         # Mount video partition read-only
         if ! grep -q ' /video ' /proc/mounts; then
             if ! mount -t vfat -o ro \
