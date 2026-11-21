@@ -1,0 +1,47 @@
+
+#!/bin/sh
+
+LOG=/run/lss-usb-storage.log
+DEVICE=/dev/mmcblk0p3
+
+case "$1" in
+    start)
+        echo "Starting LSS USB Storage" > "$LOG"
+
+        # Verify the dedicated video partition exists
+        if [ ! -b "$DEVICE" ]; then
+            echo "Video partition not found" >> "$LOG"
+            exit 1
+        fi
+
+        # Never export a locally mounted filesystem
+        if grep -q '^/dev/mmcblk0p3 ' /proc/mounts; then
+            echo "Video partition is mounted locally" >> "$LOG"
+            exit 1
+        fi
+
+        # Enable USB device controller
+        if ! modprobe dwc2 >> "$LOG" 2>&1; then
+            echo "Failed to load dwc2" >> "$LOG"
+            exit 1
+        fi
+
+        # Expose only the video partition
+        if ! modprobe g_mass_storage \
+            file="$DEVICE" \
+            removable=1 \
+            ro=0 \
+            stall=0 >> "$LOG" 2>&1; then
+            echo "Failed to load g_mass_storage" >> "$LOG"
+            exit 1
+        fi
+
+        echo "LSS USB Storage started" >> "$LOG"
+        ;;
+
+    stop)
+        modprobe -r g_mass_storage 2>/dev/null || true
+        ;;
+esac
+
+exit 0
