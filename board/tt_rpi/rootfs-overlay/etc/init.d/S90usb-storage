@@ -1,46 +1,85 @@
 
 #!/bin/sh
 
-LOG=/run/lss-usb-storage.log
+LOG=/run/lss-mode.log
+MODEFILE=/run/lss-mode
 DEVICE=/dev/mmcblk0p3
+
+# Detect USB host enumeration
+host_detected() {
+    for f in /sys/class/udc/*/state; do
+        [ -r "$f" ] || continue
+
+        case "$(cat "$f" 2>/dev/null)" in
+            configured|suspended|addressed|default)
+                return 0
+                ;;
+        esac
+    done
+    return 1
+}
 
 case "$1" in
     start)
-        echo "Starting LSS USB Storage" > "$LOG"
+        echo "Starting LSS mode detection" > "$LOG"
+        echo "error" > "$MODEFILE"
 
-        # Verify the dedicated video partition exists
         if [ ! -b "$DEVICE" ]; then
-            echo "Video partition not found" >> "$LOG"
+            echo "Video partition missing" >> "$LOG"
             exit 1
         fi
 
-        # Never export a locally mounted filesystem
-        if grep -q '^/dev/mmcblk0p3 ' /proc/mounts; then
-            echo "Video partition is mounted locally" >> "$LOG"
-            exit 1
-        fi
-
-        # Enable USB device controller
+        # Register USB gadget first
         if ! modprobe dwc2 >> "$LOG" 2>&1; then
-            echo "Failed to load dwc2" >> "$LOG"
+            echo "dwc2 load failed" >> "$LOG"
             exit 1
         fi
 
-        # Expose only the video partition
         if ! modprobe g_mass_storage \
             file="$DEVICE" \
             removable=1 \
             ro=0 \
             stall=0 >> "$LOG" 2>&1; then
-            echo "Failed to load g_mass_storage" >> "$LOG"
+            echo "g_mass_storage load failed" >> "$LOG"
             exit 1
         fi
 
-        echo "LSS USB Storage started" >> "$LOG"
+        # Allow time for PC enumeration
+        i=0
+        while [ "$i" -lt 30 ]; do
+
+            if host_detected; then
+                echo "usb" > "$MODEFILE"
+                echo "USB storage mode" >> "$LOG"
+
+                /usr/bin/psplash-write \
+                    "MSG USB STORAGE MODE" \
+                    2>/dev/null || true
+
+                exit 0
+            fi
+
+            sleep 0.2
+            i=$((i + 1))
+        done
+
+        # No host detected: release USB storage
+        if ! modprobe -r g_mass_storage \
+            >> "$LOG" 2>&1; then
+            echo "USB storage release failed" >> "$LOG"
+            exit 1
+        fi
+
+        echo "playback" > "$MODEFILE"
+        echo "Playback mode" >> "$LOG"
         ;;
 
     stop)
-        modprobe -r g_mass_storage 2>/dev/null || true
+        if [ -f "$MODEFILE" ] &&
+           [ "$(cat "$MODEFILE")" = "usb" ]; then
+            modprobe -r g_mass_storage \
+                2>/dev/null || true
+        fi
         ;;
 esac
 
