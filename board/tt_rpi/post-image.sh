@@ -53,6 +53,7 @@ boot_delay=0
 disable_splash=1
 enable_uart=1
 dtoverlay=miniuart-bt
+dtoverlay=dwc2,dr_mode=peripheral
 device_tree=bcm2708-rpi-zero-w.dtb
 
 hdmi_force_hotplug=1
