@@ -111,7 +111,7 @@ case "$1" in
 
         # Wait up to 6 seconds
         i=0
-        while [ "$i" -lt 30 ]; do
+        while [ "$i" -lt 10 ]; do
             if host_detected; then
                 echo "usb" > "$MODEFILE"
                 report "USB STORAGE MODE"
