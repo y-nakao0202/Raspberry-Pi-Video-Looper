@@ -109,15 +109,15 @@ case "$1" in
 
         report "WAITING FOR PC"
 
-        # Wait up to 6 seconds
+        # Wait up to 1 second
         i=0
-        while [ "$i" -lt 10 ]; do
+        while [ "$i" -lt 5 ]; do
             if host_detected; then
                 echo "usb" > "$MODEFILE"
                 report "USB STORAGE MODE"
                 exit 0
             fi
-
+        
             sleep 0.2
             i=$((i + 1))
         done
