@@ -18,13 +18,27 @@ gadget_loaded() {
 }
 
 # Safely release USB storage
+
+# Safely release USB storage
 release_gadget() {
     if gadget_loaded; then
-        modprobe -r g_mass_storage \
-            >> "$LOG" 2>&1 || return 1
+
+        # Remove only the mass storage module
+        if command -v rmmod >/dev/null 2>&1; then
+            rmmod g_mass_storage >> "$LOG" 2>&1 || true
+        else
+            modprobe -r g_mass_storage >> "$LOG" 2>&1 || true
+        fi
     fi
 
-    ! gadget_loaded
+    # Verify that the module is actually gone
+    if gadget_loaded; then
+        echo "ERROR: g_mass_storage still loaded" >> "$LOG"
+        return 1
+    fi
+
+    echo "USB storage successfully released" >> "$LOG"
+    return 0
 }
 
 # Enter playback only after storage is released
